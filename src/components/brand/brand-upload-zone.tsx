@@ -83,12 +83,14 @@ export function BrandUploadZone() {
       const res = await fetch('/api/brand-dna/extract', { method: 'POST', body: form })
       setProgress(85)
 
+      const rawText = await res.text()
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Extraction failed')
+        let errMsg = `HTTP ${res.status}`
+        try { errMsg = JSON.parse(rawText).error || errMsg } catch { errMsg = rawText.slice(0, 120) || errMsg }
+        throw new Error(errMsg)
       }
 
-      const data = await res.json()
+      const data = JSON.parse(rawText)
       setDna(data.dna)
       setPageCount(data.pageCount ?? 0)
       setProgress(100)
