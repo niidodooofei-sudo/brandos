@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PDFParse } from 'pdf-parse'
 import { getAuthId } from '@/lib/auth-helper'
 import { extractBrandDNA } from '@/lib/ai'
 import { checkRateLimit } from '@/lib/rate-limit'
@@ -21,23 +22,26 @@ export async function POST(request: NextRequest) {
     if (file.size > 50 * 1024 * 1024) return NextResponse.json({ error: 'File too large (max 50MB)' }, { status: 400 })
 
     const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
 
-    // Parse PDF text
-    const pdfParseModule = await import('pdf-parse')
-    const pdfParse = (pdfParseModule as unknown as { default: (buf: Buffer) => Promise<{ text: string; numpages: number }> }).default ?? pdfParseModule
-    const parsed = await (pdfParse as (buf: Buffer) => Promise<{ text: string; numpages: number }>)(buffer)
-    const pdfText = parsed.text
+    const parser = new PDFParse({ data: arrayBuffer })
+    const result = await parser.getText()
+    await parser.destroy()
+
+    const pdfText = result.text
+    const pageCount = result.total
 
     if (!pdfText || pdfText.trim().length < 50) {
-      return NextResponse.json({ error: 'Could not extract text from PDF. Make sure the PDF contains readable text.' }, { status: 422 })
+      return NextResponse.json({
+        error: 'Could not extract text from this PDF. Make sure it contains readable (non-scanned) text.',
+      }, { status: 422 })
     }
 
     const dna = await extractBrandDNA(pdfText)
 
-    return NextResponse.json({ dna, pageCount: parsed.numpages })
+    return NextResponse.json({ dna, pageCount })
   } catch (err) {
     console.error('PDF extraction error:', err)
-    return NextResponse.json({ error: 'Failed to process PDF' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Failed to process PDF'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
