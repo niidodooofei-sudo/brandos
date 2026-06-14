@@ -20,15 +20,19 @@ const INDUSTRIES = [
   'Entertainment', 'Non-profit', 'Retail', 'Other',
 ]
 
-function NewBrandModal({ onClose, onSave }: { onClose: () => void; onSave: (name: string, color: string, industry: string) => void }) {
+function NewBrandModal({ onClose, onSave }: { onClose: () => void; onSave: (name: string, color: string, industry: string) => Promise<void> }) {
   const [name, setName] = useState('')
   const [color, setColor] = useState('#7c3aed')
   const [industry, setIndustry] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = () => {
-    if (!name.trim()) return
-    onSave(name.trim(), color, industry)
-    onClose()
+  const handleSave = async () => {
+    if (!name.trim() || saving) return
+    setSaving(true)
+    try {
+      await onSave(name.trim(), color, industry)
+      onClose()
+    } catch { setSaving(false) }
   }
 
   return (
@@ -117,8 +121,8 @@ function NewBrandModal({ onClose, onSave }: { onClose: () => void; onSave: (name
 
         <div className="flex gap-2.5 mt-6">
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button variant="brand" className="flex-1" onClick={handleSave} disabled={!name.trim()}>
-            Create Brand
+          <Button variant="brand" className="flex-1" onClick={handleSave} disabled={!name.trim() || saving}>
+            {saving ? 'Creating…' : 'Create Brand'}
           </Button>
         </div>
       </div>
@@ -284,7 +288,7 @@ export default function BrandsPage() {
       {showModal && (
         <NewBrandModal
           onClose={() => setShowModal(false)}
-          onSave={(name, color, industry) => addBrand(name, color, industry)}
+          onSave={async (name, color, industry) => { await addBrand(name, color, industry) }}
         />
       )}
     </div>
