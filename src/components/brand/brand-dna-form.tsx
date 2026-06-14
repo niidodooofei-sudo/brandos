@@ -68,7 +68,21 @@ export function BrandDNAForm({ section }: { section: string }) {
       const res = await fetch(`/api/brand-dna?brandId=${brandId}`)
       if (res.ok) {
         const data = await res.json()
-        if (data.dna) setDna(data.dna)
+        if (data.dna) {
+          // Rehydrate font binaries from localStorage cache
+          let loadedFonts = data.dna.loadedFonts ?? []
+          try {
+            const cached = localStorage.getItem(`brandos:fonts:${brandId}`)
+            if (cached) {
+              const full = JSON.parse(cached) as LoadedFont[]
+              loadedFonts = loadedFonts.map((meta: LoadedFont) => {
+                const match = full.find(f => f.fileName === meta.fileName)
+                return match ? { ...meta, dataUrl: match.dataUrl } : meta
+              })
+            }
+          } catch { /* ignore */ }
+          setDna({ ...data.dna, loadedFonts })
+        }
       }
     } catch { /* silent */ }
     setLoading(false)
@@ -81,16 +95,36 @@ export function BrandDNAForm({ section }: { section: string }) {
     setSaving(true); setError('')
     try {
       const merged = { ...dna, ...patch }
+
+      // Strip base64 font data before sending — store binaries in localStorage only
+      const fontsForDB = (merged.loadedFonts ?? []).map(({ dataUrl: _d, ...meta }) => meta)
+
+      // Strip large image data URLs if total payload would be too big
+      const imagesForDB: Record<string, string> = {}
+      for (const [k, v] of Object.entries(merged.layoutImages ?? {})) {
+        if (v && v.length < 400_000) imagesForDB[k] = v // skip if > ~300KB each
+      }
+
+      // Cache full font binaries locally for this session
+      if (merged.loadedFonts?.length) {
+        try { localStorage.setItem(`brandos:fonts:${brandId}`, JSON.stringify(merged.loadedFonts)) } catch { /* ignore quota */ }
+      }
+
+      const payload = { brandId, ...merged, loadedFonts: fontsForDB, layoutImages: imagesForDB }
+
       const res = await fetch('/api/brand-dna', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brandId, ...merged }),
+        body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error('Save failed')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
       setDna(merged)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
-    } catch { setError('Failed to save. Please try again.') }
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed to save. Please try again.') }
     setSaving(false)
   }
 

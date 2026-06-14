@@ -151,6 +151,8 @@ model BrandDNA {
 
   logoFiles     Json?
   logoClearance Json?
+  loadedFonts   Json?
+  layoutImages  Json?
 
   isComplete  Boolean  @default(false)
   sourceFiles Json?
