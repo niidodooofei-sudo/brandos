@@ -75,7 +75,7 @@ async function extractPDFText(file: File): Promise<string> {
   return parts.join('\n')
 }
 
-export function BrandUploadZone() {
+export function BrandUploadZone({ onSaved }: { onSaved?: () => void } = {}) {
   const { activeBrand } = useBrand()
   const [stage, setStage] = useState<ParseStage>('idle')
   const [fileName, setFileName] = useState('')
@@ -149,6 +149,7 @@ export function BrandUploadZone() {
         body: JSON.stringify({ brandId, ...dna, isComplete: true }),
       })
       if (!res.ok) throw new Error('Failed to save Brand DNA')
+      onSaved?.()
       setStage('done')
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to save Brand DNA')

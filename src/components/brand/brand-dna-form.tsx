@@ -53,7 +53,7 @@ function SaveBar({ onSave, saving, saved, error }: { onSave: () => void; saving:
 
 // ─── Main form ────────────────────────────────────────────────────────────────
 
-export function BrandDNAForm({ section }: { section: string }) {
+export function BrandDNAForm({ section, onSaved }: { section: string; onSaved?: () => void }) {
   const { activeBrand } = useBrand()
   const [dna, setDna] = useState<DNAData>({})
   const [loading, setLoading] = useState(false)
@@ -130,6 +130,7 @@ export function BrandDNAForm({ section }: { section: string }) {
       }
       setDna(merged)
       setSaved(true)
+      onSaved?.()
       setTimeout(() => setSaved(false), 2500)
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed to save. Please try again.') }
     setSaving(false)

@@ -1,35 +1,66 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle2, Circle, ChevronRight, Upload, Palette, Type, Layout, Eye, Volume2, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { BrandDNAForm } from '@/components/brand/brand-dna-form'
 import { BrandUploadZone } from '@/components/brand/brand-upload-zone'
+import { useBrand } from '@/contexts/brand-context'
 import { cn } from '@/lib/utils'
 
 const sections = [
-  { id: 'upload', label: 'Upload Guidelines', icon: Upload, description: 'Upload your brand guideline PDF for AI extraction' },
-  { id: 'typography', label: 'Typography', icon: Type, description: 'Fonts, weights, and type scale' },
-  { id: 'colors', label: 'Colors', icon: Palette, description: 'Primary, secondary, accent, and background' },
-  { id: 'layout', label: 'Layout Style', icon: Layout, description: 'Grid system and layout preferences' },
-  { id: 'visual', label: 'Visual Style', icon: Eye, description: 'Photography, illustration, and image treatment' },
-  { id: 'voice', label: 'Voice & Tone', icon: Volume2, description: 'Brand personality and copy rules' },
-  { id: 'logo', label: 'Logo & Assets', icon: ImageIcon, description: 'Logo files and clearance rules' },
+  { id: 'upload',     label: 'Upload Guidelines', icon: Upload,    description: 'Upload your brand guideline PDF for AI extraction' },
+  { id: 'typography', label: 'Typography',         icon: Type,      description: 'Fonts, weights, and type scale' },
+  { id: 'colors',     label: 'Colors',             icon: Palette,   description: 'Primary, secondary, accent, and background' },
+  { id: 'layout',     label: 'Layout Style',       icon: Layout,    description: 'Grid system and layout preferences' },
+  { id: 'visual',     label: 'Visual Style',       icon: Eye,       description: 'Photography, illustration, and image treatment' },
+  { id: 'voice',      label: 'Voice & Tone',       icon: Volume2,   description: 'Brand personality and copy rules' },
+  { id: 'logo',       label: 'Logo & Assets',      icon: ImageIcon, description: 'Logo files and clearance rules' },
 ]
 
-const sectionCompletion: Record<string, boolean> = {
-  upload: false,
-  typography: true,
-  colors: true,
-  layout: false,
-  visual: false,
-  voice: false,
-  logo: true,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeCompletion(dna: Record<string, any> | null): Record<string, boolean> {
+  if (!dna) return Object.fromEntries(sections.map(s => [s.id, false]))
+  const colors = Array.isArray(dna.colors) ? dna.colors : []
+  const logoFiles = dna.logoFiles && typeof dna.logoFiles === 'object' ? dna.logoFiles : {}
+  const fonts = Array.isArray(dna.loadedFonts) ? dna.loadedFonts : []
+  return {
+    upload:     !!(dna.isComplete || dna.primaryFont || colors.length > 0),
+    typography: !!(dna.primaryFont || fonts.length > 0),
+    colors:     colors.length > 0,
+    layout:     !!(dna.layoutPreference),
+    visual:     !!(dna.visualStyle),
+    voice:      !!(dna.tone),
+    logo:       Object.keys(logoFiles).length > 0,
+  }
 }
 
 export default function BrandDNAPage() {
+  const { activeBrand } = useBrand()
   const [activeSection, setActiveSection] = useState('typography')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [dna, setDna] = useState<Record<string, any> | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const brandId = activeBrand?.id
+
+  const loadDNA = useCallback(async () => {
+    if (!brandId) { setDna(null); return }
+    try {
+      const res = await fetch(`/api/brand-dna?brandId=${brandId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDna(data.dna ?? null)
+      }
+    } catch { /* silent */ }
+  }, [brandId])
+
+  useEffect(() => { loadDNA() }, [loadDNA, refreshKey])
+
+  const handleSaved = useCallback(() => setRefreshKey(k => k + 1), [])
+
+  const sectionCompletion = computeCompletion(dna)
   const completedCount = Object.values(sectionCompletion).filter(Boolean).length
   const overallPct = Math.round((completedCount / sections.length) * 100)
 
@@ -137,8 +168,8 @@ export default function BrandDNAPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {activeSection === 'upload' && <BrandUploadZone />}
-              {activeSection !== 'upload' && <BrandDNAForm section={activeSection} />}
+              {activeSection === 'upload' && <BrandUploadZone onSaved={handleSaved} />}
+              {activeSection !== 'upload' && <BrandDNAForm section={activeSection} onSaved={handleSaved} />}
             </CardContent>
           </Card>
         </div>
