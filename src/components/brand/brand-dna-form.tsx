@@ -1,304 +1,397 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
+import { useBrand } from '@/contexts/brand-context'
+
+interface DNAData {
+  primaryFont?: string
+  secondaryFont?: string
+  headingWeight?: string
+  bodyWeight?: string
+  typeScale?: Record<string, number>
+  colors?: { primary?: string; secondary?: string; accent?: string; background?: string; text?: string }
+  layoutPreference?: string
+  gridSystem?: { columns?: number; gutter?: number; margin?: number }
+  visualStyle?: string
+  shapeLanguage?: string
+  imageTreatment?: { overlayOpacity?: number; filter?: string }
+  tone?: string
+  voiceRules?: { avoidWords?: string[]; preferredPhrases?: string[] }
+  isComplete?: boolean
+}
 
 interface BrandDNAFormProps {
   section: string
 }
 
 export function BrandDNAForm({ section }: BrandDNAFormProps) {
+  const { activeBrand } = useBrand()
+  const [dna, setDna] = useState<DNAData>({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  const brandId = activeBrand?.id
+
+  const loadDNA = useCallback(async () => {
+    if (!brandId) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/brand-dna?brandId=${brandId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.dna) setDna(data.dna)
+      }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [brandId])
+
+  useEffect(() => { loadDNA() }, [loadDNA])
+
+  const handleSave = async (sectionData: Partial<DNAData>) => {
+    if (!brandId) { setError('No active brand selected'); return }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch('/api/brand-dna', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandId, ...dna, ...sectionData }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setDna(prev => ({ ...prev, ...sectionData }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setError('Failed to save. Please try again.')
+    }
+    setSaving(false)
+  }
+
+  if (!brandId) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Select a brand from the sidebar to edit its DNA.</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="py-8 flex justify-center">
+        <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--fg-subtle)' }} />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {section === 'typography' && <TypographySection />}
-      {section === 'colors' && <ColorsSection />}
-      {section === 'layout' && <LayoutSection />}
-      {section === 'visual' && <VisualSection />}
-      {section === 'voice' && <VoiceSection />}
+      {section === 'typography' && <TypographySection dna={dna} onChange={handleSave} saving={saving} saved={saved} error={error} />}
+      {section === 'colors' && <ColorsSection dna={dna} onChange={handleSave} saving={saving} saved={saved} error={error} />}
+      {section === 'layout' && <LayoutSection dna={dna} onChange={handleSave} saving={saving} saved={saved} error={error} />}
+      {section === 'visual' && <VisualSection dna={dna} onChange={handleSave} saving={saving} saved={saved} error={error} />}
+      {section === 'voice' && <VoiceSection dna={dna} onChange={handleSave} saving={saving} saved={saved} error={error} />}
       {section === 'logo' && <LogoSection />}
-
-      <div className="flex items-center gap-3 pt-2 border-t border-neutral-100">
-        <Button onClick={handleSave} className="gap-2">
-          {saved && <CheckCircle2 className="h-4 w-4" />}
-          {saved ? 'Saved!' : 'Save Section'}
-        </Button>
-        <Button variant="outline">Reset to Defaults</Button>
-      </div>
     </div>
   )
 }
 
-function TypographySection() {
+interface SectionProps {
+  dna: DNAData
+  onChange: (data: Partial<DNAData>) => void
+  saving: boolean
+  saved: boolean
+  error: string
+}
+
+function SaveBar({ onSave, saving, saved, error }: { onSave: () => void; saving: boolean; saved: boolean; error: string }) {
+  return (
+    <div className="flex items-center gap-3 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+      <Button variant="brand" onClick={onSave} disabled={saving} className="gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <CheckCircle2 className="h-4 w-4" /> : null}
+        {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Section'}
+      </Button>
+      {error && <p className="text-sm" style={{ color: '#f43f5e' }}>{error}</p>}
+    </div>
+  )
+}
+
+function TypographySection({ dna, onChange, saving, saved, error }: SectionProps) {
+  const [local, setLocal] = useState({
+    primaryFont: dna.primaryFont ?? '',
+    secondaryFont: dna.secondaryFont ?? '',
+    headingWeight: dna.headingWeight ?? '700',
+    bodyWeight: dna.bodyWeight ?? '400',
+    typeScale: dna.typeScale ?? { h1: 64, h2: 48, h3: 36, h4: 28, body: 16, small: 14, caption: 12 },
+  })
+
+  useEffect(() => {
+    setLocal({
+      primaryFont: dna.primaryFont ?? '',
+      secondaryFont: dna.secondaryFont ?? '',
+      headingWeight: dna.headingWeight ?? '700',
+      bodyWeight: dna.bodyWeight ?? '400',
+      typeScale: dna.typeScale ?? { h1: 64, h2: 48, h3: 36, h4: 28, body: 16, small: 14, caption: 12 },
+    })
+  }, [dna])
+
+  const inp = 'w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+  const inpStyle = { background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--fg)' }
+  const label = 'block text-xs font-medium mb-1.5'
+  const labelStyle = { color: 'var(--fg-muted)' }
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input label="Primary Font" placeholder="e.g. Inter, Neue Haas Grotesk" defaultValue="Inter" />
-        <Input label="Secondary Font" placeholder="e.g. Georgia, Playfair Display" defaultValue="Georgia" />
-        <Select label="Heading Weight" defaultValue="700"
-          options={[
-            { value: '400', label: 'Regular (400)' },
-            { value: '500', label: 'Medium (500)' },
-            { value: '600', label: 'Semibold (600)' },
-            { value: '700', label: 'Bold (700)' },
-            { value: '800', label: 'Extrabold (800)' },
-            { value: '900', label: 'Black (900)' },
-          ]}
-        />
-        <Select label="Body Weight" defaultValue="400"
-          options={[
-            { value: '300', label: 'Light (300)' },
-            { value: '400', label: 'Regular (400)' },
-            { value: '500', label: 'Medium (500)' },
-          ]}
-        />
+        <div>
+          <label className={label} style={labelStyle}>Primary Font</label>
+          <input className={inp} style={inpStyle} placeholder="e.g. Inter, Neue Haas Grotesk" value={local.primaryFont} onChange={e => setLocal(p => ({ ...p, primaryFont: e.target.value }))} />
+        </div>
+        <div>
+          <label className={label} style={labelStyle}>Secondary Font</label>
+          <input className={inp} style={inpStyle} placeholder="e.g. Georgia, Playfair Display" value={local.secondaryFont} onChange={e => setLocal(p => ({ ...p, secondaryFont: e.target.value }))} />
+        </div>
+        <div>
+          <label className={label} style={labelStyle}>Heading Weight</label>
+          <select className={inp + ' appearance-none'} style={inpStyle} value={local.headingWeight} onChange={e => setLocal(p => ({ ...p, headingWeight: e.target.value }))}>
+            {[['400','Regular'],['500','Medium'],['600','Semibold'],['700','Bold'],['800','Extrabold'],['900','Black']].map(([v,l]) => <option key={v} value={v}>{l} ({v})</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={label} style={labelStyle}>Body Weight</label>
+          <select className={inp + ' appearance-none'} style={inpStyle} value={local.bodyWeight} onChange={e => setLocal(p => ({ ...p, bodyWeight: e.target.value }))}>
+            {[['300','Light'],['400','Regular'],['500','Medium']].map(([v,l]) => <option key={v} value={v}>{l} ({v})</option>)}
+          </select>
+        </div>
       </div>
 
       <div>
-        <p className="text-sm font-medium text-neutral-700 mb-3">Type Scale</p>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>Type Scale (px)</p>
         <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'H1', key: 'h1', default: '64' },
-            { label: 'H2', key: 'h2', default: '48' },
-            { label: 'H3', key: 'h3', default: '36' },
-            { label: 'H4', key: 'h4', default: '28' },
-            { label: 'Body', key: 'body', default: '16' },
-            { label: 'Small', key: 'small', default: '14' },
-            { label: 'Caption', key: 'caption', default: '12' },
-          ].map((t) => (
-            <div key={t.key}>
-              <label className="text-xs text-neutral-500 mb-1 block">{t.label} (px)</label>
-              <input
-                type="number"
-                defaultValue={t.default}
-                className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
-              />
+          {(['h1','h2','h3','h4','body','small','caption'] as const).map(k => (
+            <div key={k}>
+              <label className="text-xs mb-1 block capitalize" style={{ color: 'var(--fg-subtle)' }}>{k}</label>
+              <input type="number" className="w-full rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" style={inpStyle}
+                value={local.typeScale[k] ?? ''} onChange={e => setLocal(p => ({ ...p, typeScale: { ...p.typeScale, [k]: Number(e.target.value) } }))} />
             </div>
           ))}
         </div>
       </div>
 
-      <div>
-        <label className="text-sm font-medium text-neutral-700 mb-2 block">Font Preview</label>
-        <div className="rounded-xl bg-neutral-50 border border-neutral-100 p-6 space-y-2">
-          <p className="text-5xl font-bold" style={{ fontFamily: 'Inter' }}>The Quick</p>
-          <p className="text-2xl font-normal text-neutral-600">Brown fox jumps over the lazy dog</p>
-          <p className="text-base text-neutral-500">The five boxing wizards jump quickly. Pack my box with five dozen liquor jugs.</p>
+      {local.primaryFont && (
+        <div>
+          <p className="text-sm font-medium mb-2" style={{ color: 'var(--fg)' }}>Font Preview</p>
+          <div className="rounded-xl p-6 space-y-2" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}>
+            <p style={{ fontFamily: local.primaryFont, fontSize: 36, fontWeight: Number(local.headingWeight), color: 'var(--fg)', lineHeight: 1.2 }}>The Quick Brown Fox</p>
+            <p style={{ fontFamily: local.secondaryFont || local.primaryFont, fontSize: 16, color: 'var(--fg-muted)' }}>Pack my box with five dozen liquor jugs.</p>
+          </div>
         </div>
-      </div>
+      )}
+
+      <SaveBar onSave={() => onChange(local)} saving={saving} saved={saved} error={error} />
     </div>
   )
 }
 
-function ColorsSection() {
-  const [colors, setColors] = useState({
-    primary: '#1a1a2e',
-    secondary: '#16213e',
-    accent: '#e94560',
-    background: '#ffffff',
-    text: '#1a1a2e',
-  })
+function ColorsSection({ dna, onChange, saving, saved, error }: SectionProps) {
+  const [colors, setColors] = useState(dna.colors ?? { primary: '#1a1a2e', secondary: '#16213e', accent: '#e94560', background: '#ffffff', text: '#1a1a2e' })
 
-  const colorFields = [
-    { key: 'primary', label: 'Primary', description: 'Main brand color — used for CTAs, headings' },
-    { key: 'secondary', label: 'Secondary', description: 'Supporting brand color' },
-    { key: 'accent', label: 'Accent', description: 'Highlight color — promotions, badges' },
-    { key: 'background', label: 'Background', description: 'Default background color' },
-    { key: 'text', label: 'Text', description: 'Primary text color' },
-  ] as const
+  useEffect(() => { if (dna.colors) setColors(dna.colors) }, [dna.colors])
+
+  const fields = [
+    { key: 'primary' as const, label: 'Primary', desc: 'Main brand color — CTAs, headings' },
+    { key: 'secondary' as const, label: 'Secondary', desc: 'Supporting brand color' },
+    { key: 'accent' as const, label: 'Accent', desc: 'Highlight color — promotions, badges' },
+    { key: 'background' as const, label: 'Background', desc: 'Default canvas background' },
+    { key: 'text' as const, label: 'Text', desc: 'Primary body text color' },
+  ]
 
   return (
     <div className="space-y-4">
-      {colorFields.map((field) => (
-        <div key={field.key} className="flex items-center gap-4 rounded-xl border border-neutral-100 p-4">
-          <div className="relative">
-            <input
-              type="color"
-              value={colors[field.key]}
-              onChange={(e) => setColors(prev => ({ ...prev, [field.key]: e.target.value }))}
-              className="h-12 w-12 rounded-lg border border-neutral-200 cursor-pointer p-0.5"
-            />
-          </div>
+      {fields.map(f => (
+        <div key={f.key} className="flex items-center gap-4 rounded-xl p-4" style={{ border: '1px solid var(--border)' }}>
+          <input type="color" value={colors[f.key] ?? '#000000'} onChange={e => setColors(p => ({ ...p, [f.key]: e.target.value }))}
+            className="h-12 w-12 rounded-lg cursor-pointer p-0.5" style={{ border: '1px solid var(--border)' }} />
           <div className="flex-1">
-            <p className="text-sm font-medium text-neutral-900">{field.label}</p>
-            <p className="text-xs text-neutral-500">{field.description}</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{f.label}</p>
+            <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>{f.desc}</p>
           </div>
-          <input
-            type="text"
-            value={colors[field.key]}
-            onChange={(e) => setColors(prev => ({ ...prev, [field.key]: e.target.value }))}
-            className="w-28 rounded-lg border border-neutral-200 px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-neutral-900"
-          />
+          <input type="text" value={colors[f.key] ?? ''} onChange={e => setColors(p => ({ ...p, [f.key]: e.target.value }))}
+            className="w-28 rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--fg)' }} />
         </div>
       ))}
 
-      <div className="rounded-xl border border-neutral-100 p-4">
-        <p className="text-xs font-medium text-neutral-500 mb-3">Color Preview</p>
+      <div className="rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--surface-muted)' }}>
+        <p className="text-xs font-medium mb-3" style={{ color: 'var(--fg-muted)' }}>Color Preview</p>
         <div className="flex gap-2">
           {Object.entries(colors).map(([key, hex]) => (
             <div key={key} className="flex-1 text-center">
-              <div className="h-10 rounded-lg mb-1 border border-neutral-100" style={{ backgroundColor: hex }} />
-              <p className="text-[10px] text-neutral-500 capitalize">{key}</p>
+              <div className="h-10 rounded-lg mb-1" style={{ backgroundColor: hex as string, border: '1px solid var(--border)' }} />
+              <p className="text-[10px] capitalize" style={{ color: 'var(--fg-subtle)' }}>{key}</p>
             </div>
           ))}
         </div>
       </div>
+
+      <SaveBar onSave={() => onChange({ colors })} saving={saving} saved={saved} error={error} />
     </div>
   )
 }
 
-function LayoutSection() {
+function LayoutSection({ dna, onChange, saving, saved, error }: SectionProps) {
+  const [layout, setLayout] = useState(dna.layoutPreference ?? 'minimalist')
+  const [grid, setGrid] = useState(dna.gridSystem ?? { columns: 12, gutter: 24, margin: 40 })
+
+  useEffect(() => { if (dna.layoutPreference) setLayout(dna.layoutPreference) }, [dna.layoutPreference])
+  useEffect(() => { if (dna.gridSystem) setGrid(dna.gridSystem) }, [dna.gridSystem])
+
+  const inp = 'w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]'
+  const inpStyle = { background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--fg)' }
+
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-neutral-700 mb-3">Layout Preference</p>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>Layout Preference</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[
-            { value: 'minimalist', label: 'Minimalist', desc: 'Clean, whitespace-heavy' },
-            { value: 'editorial', label: 'Editorial', desc: 'Magazine-style layouts' },
-            { value: 'corporate', label: 'Corporate', desc: 'Structured, professional' },
-            { value: 'bold', label: 'Bold', desc: 'High contrast, impact' },
-            { value: 'luxury', label: 'Luxury', desc: 'Premium, refined' },
-          ].map((opt) => (
-            <label key={opt.value} className="relative flex cursor-pointer rounded-xl border-2 border-neutral-200 p-3 hover:border-indigo-300 transition-colors">
-              <input type="radio" name="layoutPref" value={opt.value} className="sr-only peer" />
-              <div>
-                <p className="text-sm font-medium text-neutral-900 peer-checked:text-indigo-700">{opt.label}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">{opt.desc}</p>
-              </div>
-            </label>
+          {[['minimalist','Minimalist','Clean, whitespace-heavy'],['editorial','Editorial','Magazine-style layouts'],['corporate','Corporate','Structured, professional'],['bold','Bold','High contrast, impact'],['luxury','Luxury','Premium, refined']].map(([v,l,d]) => (
+            <button key={v} onClick={() => setLayout(v)}
+              className="text-left rounded-xl p-3 transition-all"
+              style={{ border: `2px solid ${layout === v ? 'var(--brand)' : 'var(--border)'}`, background: layout === v ? 'var(--brand-bg)' : 'transparent' }}>
+              <p className="text-sm font-medium" style={{ color: layout === v ? 'var(--brand)' : 'var(--fg)' }}>{l}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)' }}>{d}</p>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Grid Columns</label>
-          <input type="number" defaultValue={12} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Gutter (px)</label>
-          <input type="number" defaultValue={24} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Margin (px)</label>
-          <input type="number" defaultValue={40} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
+        {([['columns','Columns',12],['gutter','Gutter (px)',24],['margin','Margin (px)',40]] as const).map(([k,l,def]) => (
+          <div key={k}>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--fg-muted)' }}>{l}</label>
+            <input type="number" className={inp} style={inpStyle} value={grid[k] ?? def} onChange={e => setGrid(p => ({ ...p, [k]: Number(e.target.value) }))} />
+          </div>
+        ))}
       </div>
+
+      <SaveBar onSave={() => onChange({ layoutPreference: layout, gridSystem: grid })} saving={saving} saved={saved} error={error} />
     </div>
   )
 }
 
-function VisualSection() {
+function VisualSection({ dna, onChange, saving, saved, error }: SectionProps) {
+  const [visual, setVisual] = useState(dna.visualStyle ?? 'photography')
+  const [shape, setShape] = useState(dna.shapeLanguage ?? 'geometric')
+  const [treatment, setTreatment] = useState(dna.imageTreatment ?? { overlayOpacity: 0.4, filter: 'none' })
+
+  useEffect(() => { if (dna.visualStyle) setVisual(dna.visualStyle) }, [dna.visualStyle])
+  useEffect(() => { if (dna.shapeLanguage) setShape(dna.shapeLanguage) }, [dna.shapeLanguage])
+  useEffect(() => { if (dna.imageTreatment) setTreatment(dna.imageTreatment) }, [dna.imageTreatment])
+
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-neutral-700 mb-3">Visual Style</p>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>Visual Style</p>
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: 'photography', label: 'Photography Driven', desc: 'Real photos as hero elements' },
-            { value: 'illustration', label: 'Illustration Driven', desc: 'Custom illustrations & graphics' },
-            { value: 'abstract', label: 'Abstract', desc: 'Shapes, gradients, geometric' },
-            { value: 'mixed', label: 'Mixed', desc: 'Combination of styles' },
-          ].map((opt) => (
-            <label key={opt.value} className="relative flex cursor-pointer rounded-xl border-2 border-neutral-200 p-4 hover:border-indigo-300 transition-colors">
-              <input type="radio" name="visualStyle" value={opt.value} defaultChecked={opt.value === 'photography'} className="sr-only" />
-              <div>
-                <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">{opt.desc}</p>
-              </div>
-            </label>
+          {[['photography','Photography Driven','Real photos as hero elements'],['illustration','Illustration Driven','Custom illustrations & graphics'],['abstract','Abstract','Shapes, gradients, geometric'],['mixed','Mixed','Combination of styles']].map(([v,l,d]) => (
+            <button key={v} onClick={() => setVisual(v)} className="text-left rounded-xl p-4 transition-all"
+              style={{ border: `2px solid ${visual === v ? 'var(--brand)' : 'var(--border)'}`, background: visual === v ? 'var(--brand-bg)' : 'transparent' }}>
+              <p className="text-sm font-medium" style={{ color: visual === v ? 'var(--brand)' : 'var(--fg)' }}>{l}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)' }}>{d}</p>
+            </button>
           ))}
         </div>
       </div>
 
       <div>
-        <p className="text-sm font-medium text-neutral-700 mb-3">Shape Language</p>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>Shape Language</p>
         <div className="flex gap-3">
-          {[
-            { value: 'geometric', label: 'Geometric', preview: 'bg-neutral-900' },
-            { value: 'organic', label: 'Organic', preview: 'rounded-full bg-indigo-500' },
-            { value: 'minimal', label: 'Minimal', preview: 'border-2 border-neutral-900' },
-            { value: 'bold', label: 'Bold', preview: 'rounded-sm bg-orange-500' },
-          ].map((opt) => (
-            <label key={opt.value} className="flex-1 cursor-pointer">
-              <input type="radio" name="shapeLanguage" value={opt.value} className="sr-only peer" />
-              <div className="rounded-xl border-2 border-neutral-200 peer-checked:border-indigo-500 p-3 text-center hover:border-neutral-300 transition-colors">
-                <div className={`h-8 w-8 mx-auto mb-2 rounded-md ${opt.preview}`} />
-                <p className="text-xs font-medium text-neutral-700">{opt.label}</p>
-              </div>
-            </label>
+          {[['geometric','Geometric'],['organic','Organic'],['minimal','Minimal'],['bold','Bold']].map(([v,l]) => (
+            <button key={v} onClick={() => setShape(v)} className="flex-1 rounded-xl p-3 text-center transition-all"
+              style={{ border: `2px solid ${shape === v ? 'var(--brand)' : 'var(--border)'}`, background: shape === v ? 'var(--brand-bg)' : 'transparent' }}>
+              <p className="text-xs font-medium" style={{ color: shape === v ? 'var(--brand)' : 'var(--fg)' }}>{l}</p>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-neutral-700">Image Treatment</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--fg)' }}>Image Treatment</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-neutral-500 mb-1 block">Overlay Opacity (0–1)</label>
-            <input type="range" min={0} max={1} step={0.05} defaultValue={0.4}
-              className="w-full accent-indigo-600" />
+            <label className="text-xs mb-1 block" style={{ color: 'var(--fg-muted)' }}>Overlay Opacity: {treatment.overlayOpacity}</label>
+            <input type="range" min={0} max={1} step={0.05} value={treatment.overlayOpacity ?? 0.4}
+              onChange={e => setTreatment(p => ({ ...p, overlayOpacity: Number(e.target.value) }))} className="w-full" />
           </div>
-          <Select label="Color Filter" defaultValue="none"
-            options={[
-              { value: 'none', label: 'None' },
-              { value: 'warm', label: 'Warm' },
-              { value: 'cool', label: 'Cool' },
-              { value: 'bw', label: 'Black & White' },
-            ]}
-          />
+          <div>
+            <label className="text-xs mb-1 block" style={{ color: 'var(--fg-muted)' }}>Color Filter</label>
+            <select className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] appearance-none"
+              style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+              value={treatment.filter ?? 'none'} onChange={e => setTreatment(p => ({ ...p, filter: e.target.value }))}>
+              {[['none','None'],['warm','Warm'],['cool','Cool'],['bw','Black & White']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
         </div>
       </div>
+
+      <SaveBar onSave={() => onChange({ visualStyle: visual, shapeLanguage: shape, imageTreatment: treatment })} saving={saving} saved={saved} error={error} />
     </div>
   )
 }
 
-function VoiceSection() {
+function VoiceSection({ dna, onChange, saving, saved, error }: SectionProps) {
+  const [tone, setTone] = useState(dna.tone ?? 'professional')
+  const [avoidWords, setAvoidWords] = useState((dna.voiceRules?.avoidWords ?? []).join('\n'))
+  const [preferredPhrases, setPreferredPhrases] = useState((dna.voiceRules?.preferredPhrases ?? []).join('\n'))
+
+  useEffect(() => {
+    if (dna.tone) setTone(dna.tone)
+    if (dna.voiceRules?.avoidWords) setAvoidWords(dna.voiceRules.avoidWords.join('\n'))
+    if (dna.voiceRules?.preferredPhrases) setPreferredPhrases(dna.voiceRules.preferredPhrases.join('\n'))
+  }, [dna])
+
+  const ta = 'w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none'
+  const taStyle = { background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--fg)' }
+
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-medium text-neutral-700 mb-3">Brand Tone</p>
+        <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>Brand Tone</p>
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { value: 'professional', label: 'Professional', desc: 'Authoritative, trustworthy, clear' },
-            { value: 'friendly', label: 'Friendly', desc: 'Warm, approachable, conversational' },
-            { value: 'premium', label: 'Premium', desc: 'Refined, aspirational, exclusive' },
-            { value: 'technical', label: 'Technical', desc: 'Precise, data-driven, expert' },
-          ].map((opt) => (
-            <label key={opt.value} className="relative flex cursor-pointer rounded-xl border-2 border-neutral-200 p-4 hover:border-indigo-300 transition-colors">
-              <input type="radio" name="tone" value={opt.value} defaultChecked={opt.value === 'professional'} className="sr-only" />
-              <div>
-                <p className="text-sm font-medium text-neutral-900">{opt.label}</p>
-                <p className="text-xs text-neutral-500 mt-0.5">{opt.desc}</p>
-              </div>
-            </label>
+          {[['professional','Professional','Authoritative, trustworthy, clear'],['friendly','Friendly','Warm, approachable, conversational'],['premium','Premium','Refined, aspirational, exclusive'],['technical','Technical','Precise, data-driven, expert'],['playful','Playful','Fun, energetic, bold']].map(([v,l,d]) => (
+            <button key={v} onClick={() => setTone(v)} className="text-left rounded-xl p-4 transition-all"
+              style={{ border: `2px solid ${tone === v ? 'var(--brand)' : 'var(--border)'}`, background: tone === v ? 'var(--brand-bg)' : 'transparent' }}>
+              <p className="text-sm font-medium" style={{ color: tone === v ? 'var(--brand)' : 'var(--fg)' }}>{l}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)' }}>{d}</p>
+            </button>
           ))}
         </div>
       </div>
 
-      <Textarea
-        label="Words to Avoid"
-        placeholder="e.g. cheap, discount, free (one per line)"
-        hint="Words the AI will never use in generated copy"
-        rows={3}
-      />
+      <div>
+        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--fg-muted)' }}>Words to Avoid <span style={{ color: 'var(--fg-subtle)' }}>(one per line)</span></label>
+        <textarea rows={3} className={ta} style={taStyle} placeholder="e.g. cheap&#10;discount&#10;free"
+          value={avoidWords} onChange={e => setAvoidWords(e.target.value)} />
+      </div>
 
-      <Textarea
-        label="Preferred Phrases"
-        placeholder="e.g. Crafted with care, Built to last (one per line)"
-        hint="Phrases the AI will prefer when generating copy"
-        rows={3}
+      <div>
+        <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--fg-muted)' }}>Preferred Phrases <span style={{ color: 'var(--fg-subtle)' }}>(one per line)</span></label>
+        <textarea rows={3} className={ta} style={taStyle} placeholder="e.g. Crafted with care&#10;Built to last"
+          value={preferredPhrases} onChange={e => setPreferredPhrases(e.target.value)} />
+      </div>
+
+      <SaveBar
+        onSave={() => onChange({
+          tone,
+          voiceRules: {
+            avoidWords: avoidWords.split('\n').map(s => s.trim()).filter(Boolean),
+            preferredPhrases: preferredPhrases.split('\n').map(s => s.trim()).filter(Boolean),
+          },
+        })}
+        saving={saving} saved={saved} error={error}
       />
     </div>
   )
@@ -308,33 +401,21 @@ function LogoSection() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
-        {[
-          { label: 'Primary Logo', desc: 'Full color on light backgrounds', id: 'logo-primary' },
-          { label: 'Reversed Logo', desc: 'White/light on dark backgrounds', id: 'logo-dark' },
-          { label: 'Icon / Mark', desc: 'Symbol only, no wordmark', id: 'logo-icon' },
-          { label: 'Wordmark', desc: 'Text-only logo', id: 'logo-wordmark' },
-        ].map((item) => (
-          <label key={item.id} className="cursor-pointer">
-            <p className="text-sm font-medium text-neutral-700 mb-1.5">{item.label}</p>
-            <div className="flex flex-col items-center justify-center gap-2 h-24 rounded-xl border-2 border-dashed border-neutral-200 hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors">
+        {[['Primary Logo','Full color on light backgrounds'],['Reversed Logo','White/light on dark backgrounds'],['Icon / Mark','Symbol only, no wordmark'],['Wordmark','Text-only logo']].map(([l,d]) => (
+          <label key={l} className="cursor-pointer">
+            <p className="text-sm font-medium mb-1.5" style={{ color: 'var(--fg)' }}>{l}</p>
+            <div className="flex flex-col items-center justify-center gap-2 h-24 rounded-xl border-2 border-dashed transition-colors"
+              style={{ borderColor: 'var(--border)' }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--brand-light)')}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
               <input type="file" accept="image/*,.svg" className="sr-only" />
-              <div className="text-neutral-300 text-2xl">+</div>
-              <p className="text-xs text-neutral-400">{item.desc}</p>
+              <div className="text-2xl" style={{ color: 'var(--fg-subtle)' }}>+</div>
+              <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>{d}</p>
             </div>
           </label>
         ))}
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Min Logo Size (px)</label>
-          <input type="number" defaultValue={80} className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-neutral-700 mb-1.5 block">Clear Space Rule</label>
-          <input type="text" defaultValue="1× logo height" className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-      </div>
+      <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>Logo file storage coming soon — use the PDF upload to extract logo rules from your brand guidelines.</p>
     </div>
   )
 }
