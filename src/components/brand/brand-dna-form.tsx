@@ -27,6 +27,8 @@ interface DNAData {
   imageTreatment?: { overlayOpacity?: number; filter?: string }
   tone?: string
   voiceRules?: { avoidWords?: string[]; preferredPhrases?: string[] }
+  logoFiles?: Record<string, string>
+  logoClearance?: string
   isComplete?: boolean
 }
 
@@ -100,17 +102,22 @@ export function BrandDNAForm({ section }: { section: string }) {
       const fontsForDB = (merged.loadedFonts ?? []).map(({ dataUrl: _d, ...meta }) => meta)
 
       // Strip large image data URLs if total payload would be too big
-      const imagesForDB: Record<string, string> = {}
-      for (const [k, v] of Object.entries(merged.layoutImages ?? {})) {
-        if (v && v.length < 400_000) imagesForDB[k] = v // skip if > ~300KB each
+      const filterImages = (src: Record<string, string> | undefined) => {
+        const out: Record<string, string> = {}
+        for (const [k, v] of Object.entries(src ?? {})) {
+          if (v && v.length < 400_000) out[k] = v
+        }
+        return out
       }
+      const imagesForDB = filterImages(merged.layoutImages)
+      const logosForDB  = filterImages(merged.logoFiles)
 
       // Cache full font binaries locally for this session
       if (merged.loadedFonts?.length) {
         try { localStorage.setItem(`brandos:fonts:${brandId}`, JSON.stringify(merged.loadedFonts)) } catch { /* ignore quota */ }
       }
 
-      const payload = { brandId, ...merged, loadedFonts: fontsForDB, layoutImages: imagesForDB }
+      const payload = { brandId, ...merged, loadedFonts: fontsForDB, layoutImages: imagesForDB, logoFiles: logosForDB }
 
       const res = await fetch('/api/brand-dna', {
         method: 'PUT',
@@ -140,7 +147,7 @@ export function BrandDNAForm({ section }: { section: string }) {
       {section === 'layout'     && <LayoutSection     {...sp} />}
       {section === 'visual'     && <VisualSection     {...sp} />}
       {section === 'voice'      && <VoiceSection      {...sp} />}
-      {section === 'logo'       && <LogoSection />}
+      {section === 'logo'       && <LogoSection      {...sp} />}
     </div>
   )
 }
@@ -631,25 +638,120 @@ function VoiceSection({ dna, save, saving, saved, error }: SP) {
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 
-function LogoSection() {
+const LOGO_SLOTS = [
+  { key: 'primary',  label: 'Primary Logo',  desc: 'Full color · light background',   bg: '#ffffff' },
+  { key: 'reversed', label: 'Reversed Logo',  desc: 'Light version · dark background', bg: '#1a1a2e' },
+  { key: 'icon',     label: 'Icon / Mark',    desc: 'Symbol only, no wordmark',        bg: '#f5f5f7' },
+  { key: 'wordmark', label: 'Wordmark',       desc: 'Text-only logo',                  bg: '#ffffff' },
+]
+
+function LogoSection({ dna, save, saving, saved, error }: SP) {
+  const [logos, setLogos] = useState<Record<string, string>>(
+    dna.logoFiles && typeof dna.logoFiles === 'object' ? (dna.logoFiles as Record<string, string>) : {}
+  )
+  const [clearance, setClearance] = useState(
+    typeof dna.logoClearance === 'string' ? dna.logoClearance : ''
+  )
+
+  useEffect(() => {
+    setLogos(dna.logoFiles && typeof dna.logoFiles === 'object' ? (dna.logoFiles as Record<string, string>) : {})
+    setClearance(typeof dna.logoClearance === 'string' ? dna.logoClearance : '')
+  }, [dna.logoFiles, dna.logoClearance])
+
+  const handleFile = (key: string, file: File) => {
+    const reader = new FileReader()
+    reader.onload = e => setLogos(p => ({ ...p, [key]: e.target?.result as string }))
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = (key: string) => setLogos(p => { const n = { ...p }; delete n[key]; return n })
+
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        {[['Primary Logo','Full color on light backgrounds'],['Reversed Logo','White/light on dark backgrounds'],['Icon / Mark','Symbol only, no wordmark'],['Wordmark','Text-only logo']].map(([l,d]) => (
-          <label key={l} className="cursor-pointer">
-            <p className="text-sm font-medium mb-1.5" style={{ color: 'var(--fg)' }}>{l}</p>
-            <div className="flex flex-col items-center justify-center gap-2 h-24 rounded-xl border-2 border-dashed transition-colors"
-              style={{ borderColor: 'var(--border)' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--brand-light)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
-              <input type="file" accept="image/*,.svg" className="sr-only" />
-              <div className="text-2xl" style={{ color: 'var(--fg-subtle)' }}>+</div>
-              <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>{d}</p>
-            </div>
-          </label>
-        ))}
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm font-semibold mb-1" style={{ color: 'var(--fg)' }}>Logo Files</p>
+        <p className="text-xs mb-4" style={{ color: 'var(--fg-muted)' }}>Upload SVG, PNG, or WebP. Each slot shows a preview on the correct background color.</p>
+
+        <div className="grid grid-cols-2 gap-4">
+          {LOGO_SLOTS.map(({ key, label, desc, bg }) => {
+            const isDark = bg === '#1a1a2e'
+            const placeholderColor = isDark ? 'rgba(255,255,255,0.35)' : 'var(--fg-subtle)'
+            const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'var(--border)'
+            return (
+              <div key={key}>
+                <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--fg-muted)' }}>{label}</p>
+                <label className="cursor-pointer block">
+                  <div
+                    className="relative rounded-xl overflow-hidden transition-all"
+                    style={{ border: `2px dashed ${borderColor}`, minHeight: 120, background: bg }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = isDark ? 'rgba(124,58,237,0.6)' : 'var(--brand-light)')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = borderColor)}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*,.svg"
+                      className="sr-only"
+                      onChange={e => e.target.files?.[0] && handleFile(key, e.target.files[0])}
+                    />
+                    {logos[key] ? (
+                      <>
+                        <img
+                          src={logos[key]}
+                          alt={label}
+                          className="w-full object-contain p-4"
+                          style={{ maxHeight: 120 }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                          style={{ background: 'rgba(0,0,0,0.4)' }}>
+                          <p className="text-white text-xs font-semibold">Replace</p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 h-28">
+                        <div className="h-9 w-9 rounded-xl border-2 border-dashed flex items-center justify-center"
+                          style={{ borderColor }}>
+                          <Plus className="h-4 w-4" style={{ color: placeholderColor }} />
+                        </div>
+                        <p className="text-xs text-center px-3" style={{ color: placeholderColor }}>{desc}</p>
+                      </div>
+                    )}
+                  </div>
+                </label>
+                {logos[key] && (
+                  <button
+                    className="mt-1 text-xs"
+                    style={{ color: '#f43f5e' }}
+                    onClick={() => removeLogo(key)}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
-      <p className="text-xs" style={{ color: 'var(--fg-subtle)' }}>Logo file storage coming soon — use the PDF upload to extract logo rules from your brand guidelines.</p>
+
+      <div>
+        <label className={LBL} style={LBL_STYLE}>
+          Logo Usage Rules & Clearance
+        </label>
+        <textarea
+          rows={3}
+          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+          style={INP_STYLE}
+          placeholder="e.g. Maintain minimum clearance of 2× the logo height. Never rotate, skew, or place on busy backgrounds."
+          value={clearance}
+          onChange={e => setClearance(e.target.value)}
+        />
+      </div>
+
+      <SaveBar
+        onSave={() => save({ logoFiles: logos, logoClearance: clearance })}
+        saving={saving}
+        saved={saved}
+        error={error}
+      />
     </div>
   )
 }
