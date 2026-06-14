@@ -24,8 +24,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
 
     // Parse PDF text
-    const pdfParse = (await import('pdf-parse')).default
-    const parsed = await pdfParse(buffer)
+    const pdfParseModule = await import('pdf-parse')
+    const pdfParse = (pdfParseModule as unknown as { default: (buf: Buffer) => Promise<{ text: string; numpages: number }> }).default ?? pdfParseModule
+    const parsed = await (pdfParse as (buf: Buffer) => Promise<{ text: string; numpages: number }>)(buffer)
     const pdfText = parsed.text
 
     if (!pdfText || pdfText.trim().length < 50) {
