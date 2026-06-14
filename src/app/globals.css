@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces */
+  --background: #f7f6ff;
+  --surface: #ffffff;
+  --surface-muted: #f0effe;
+  --surface-inset: #e9e7fb;
+
+  /* Text */
+  --fg: #0c0b17;
+  --fg-muted: #615d7c;
+  --fg-subtle: #9b97b4;
+
+  /* Brand violet */
+  --brand: #7c3aed;
+  --brand-dark: #6d28d9;
+  --brand-light: #a78bfa;
+  --brand-bg: rgba(124, 58, 237, 0.08);
+  --brand-bg-hover: rgba(124, 58, 237, 0.14);
+
+  /* Accents */
+  --amber: #f59e0b;
+  --emerald: #10b981;
+  --sky: #0ea5e9;
+  --rose: #f43f5e;
+  --orange: #f97316;
+
+  /* Borders */
+  --border: #e3e1f2;
+  --border-muted: #edeafb;
+
+  /* Sidebar */
+  --sidebar: #07060f;
+  --sidebar-border: rgba(255, 255, 255, 0.055);
+  --sidebar-active-bg: rgba(124, 58, 237, 0.18);
+  --sidebar-active-fg: #c4b5fd;
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-width: 240px;
+  --header-height: 56px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(10, 6, 30, 0.04);
+  --shadow-sm: 0 1px 3px rgba(10, 6, 30, 0.06), 0 1px 2px rgba(10, 6, 30, 0.04);
+  --shadow-md: 0 4px 8px rgba(10, 6, 30, 0.06), 0 2px 4px rgba(10, 6, 30, 0.04);
+  --shadow-lg: 0 10px 28px rgba(10, 6, 30, 0.09), 0 4px 10px rgba(10, 6, 30, 0.05);
+  --shadow-xl: 0 20px 50px rgba(10, 6, 30, 0.12), 0 8px 20px rgba(10, 6, 30, 0.06);
+
+  /* Radius */
+  --radius-sm: 0.5rem;
+  --radius: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--fg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--background);
+  color: var(--fg);
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
+
+/* Focus */
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Score ring */
+@keyframes score-fill { from { stroke-dasharray: 0 100; } }
+
+/* Hover lift */
+.lift-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.lift-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Legacy alias */
+.asset-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.asset-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+/* Shimmer loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--border-muted) 50%, var(--surface-muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+/* Animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.22s ease forwards; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down { animation: slideDown 0.16s ease forwards; }
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in { animation: scaleIn 0.18s ease forwards; }
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass surface */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Quick create card hover */
+.quick-card { transition: border-color 0.15s ease, transform 0.18s ease, box-shadow 0.18s ease; }
+.quick-card:hover { border-color: var(--brand-light) !important; transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+/* Dot indicator pulse */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+.animate-pulse-dot { animation: pulseDot 1.6s ease infinite; }

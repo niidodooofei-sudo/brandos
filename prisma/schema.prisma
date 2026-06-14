@@ -1,0 +1,289 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  DESIGNER
+  MEMBER
+  VIEWER
+}
+
+enum PlanType {
+  STARTER
+  PRO
+  AGENCY
+  ENTERPRISE
+}
+
+enum AssetStatus {
+  PENDING
+  GENERATING
+  COMPLETE
+  FAILED
+}
+
+enum OutputCategory {
+  SOCIAL
+  PRINT
+  WEB
+  CORPORATE
+}
+
+enum ExportFormat {
+  PNG
+  JPG
+  PDF
+  SVG
+}
+
+enum ExportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETE
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  COMPLETE
+  ARCHIVED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      PlanType @default(STARTER)
+  ownerId   String
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User        @relation("OrgOwner", fields: [ownerId], references: [id])
+  members OrgMember[]
+  brands  Brand[]
+
+  @@map("organizations")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedOrgs   Organization[] @relation("OrgOwner")
+  memberships OrgMember[]
+  assets      Asset[]
+  exportJobs  ExportJob[]
+  campaigns   Campaign[]
+
+  @@map("users")
+}
+
+model OrgMember {
+  id       String   @id @default(cuid())
+  orgId    String
+  userId   String
+  role     UserRole @default(MEMBER)
+  brandIds String[] @default([])
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+  @@map("org_members")
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  slug      String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org        Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  dna        BrandDNA?
+  assets     Asset[]
+  campaigns  Campaign[]
+  blueprints Blueprint[]
+  uploads    BrandUpload[]
+
+  @@unique([orgId, slug])
+  @@map("brands")
+}
+
+model BrandDNA {
+  id      String @id @default(cuid())
+  brandId String @unique
+
+  primaryFont   String?
+  secondaryFont String?
+  headingWeight String?
+  bodyWeight    String?
+  typeScale     Json?
+
+  colors Json?
+
+  layoutPreference String?
+  gridSystem       Json?
+  spacingScale     Json?
+
+  visualStyle    String?
+  imageTreatment Json?
+  shapeLanguage  String?
+
+  tone       String?
+  voiceRules Json?
+
+  logoFiles     Json?
+  logoClearance Json?
+
+  isComplete  Boolean  @default(false)
+  sourceFiles Json?
+  extractedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("brand_dna")
+}
+
+model BrandUpload {
+  id          String   @id @default(cuid())
+  brandId     String
+  fileName    String
+  fileUrl     String
+  fileType    String?
+  parseStatus String   @default("pending")
+  parseResult Json?
+  createdAt   DateTime @default(now())
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@map("brand_uploads")
+}
+
+model Blueprint {
+  id              String         @id @default(cuid())
+  orgId           String?
+  brandId         String?
+  name            String
+  outputType      String
+  category        OutputCategory
+  layoutLogic     Json
+  components      Json
+  constraints     Json
+  styleAffinities String[]       @default([])
+  hierarchyScore  Int            @default(80)
+  isLocked        Boolean        @default(false)
+  isActive        Boolean        @default(true)
+  isSystem        Boolean        @default(false)
+  version         Int            @default(1)
+  createdBy       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  brand  Brand?  @relation(fields: [brandId], references: [id])
+  assets Asset[]
+
+  @@map("blueprints")
+}
+
+model Asset {
+  id          String      @id @default(cuid())
+  orgId       String
+  brandId     String
+  createdById String
+  blueprintId String?
+  campaignId  String?
+  outputType  String
+  name        String?
+  status      AssetStatus @default(PENDING)
+
+  contentInputs     Json
+  variations        Json?
+  selectedVariation Int?
+
+  brandScore     Int?
+  scoreBreakdown Json?
+
+  fileUrls     Json?
+  thumbnailUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brand     Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdBy User       @relation(fields: [createdById], references: [id])
+  blueprint Blueprint? @relation(fields: [blueprintId], references: [id])
+  campaign  Campaign?  @relation(fields: [campaignId], references: [id])
+  exports   ExportJob[]
+
+  @@index([brandId])
+  @@index([createdAt(sort: Desc)])
+  @@map("assets")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  orgId       String
+  brandId     String
+  name        String
+  brief       String?
+  status      CampaignStatus @default(DRAFT)
+  outputTypes String[]       @default([])
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  brand     Brand  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id])
+  assets    Asset[]
+
+  @@map("campaigns")
+}
+
+model ExportJob {
+  id          String       @id @default(cuid())
+  assetId     String
+  userId      String
+  format      ExportFormat
+  status      ExportStatus @default(QUEUED)
+  fileUrl     String?
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("export_jobs")
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  orgId      String
+  brandId    String?
+  userId     String?
+  eventType  String
+  properties Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([orgId, eventType])
+  @@index([createdAt(sort: Desc)])
+  @@map("analytics_events")
+}
