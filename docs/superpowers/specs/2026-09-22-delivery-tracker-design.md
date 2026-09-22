@@ -83,7 +83,10 @@ spec:
 5. **Checklist depth**: adopted as originally specified — optional
    free-text sub-items on a work item (e.g. "Draft sent / Feedback
    received / Final approved"), a memory aid with no due dates or
-   independent tracking. Explicitly not a subtask system.
+   independent tracking. Explicitly not a subtask system. Storage:
+   the original spec's schema omitted a field for this — added
+   `checklist Json?` to `DeliveryItem`, holding an array of
+   `{ text: string; done: boolean }` objects.
 
 ## Data Model (Prisma Schema Additions)
 
@@ -156,6 +159,7 @@ model DeliveryItem {
   status       DeliveryStatus   @default(NOT_STARTED)
   dueDate      DateTime
   deliveredAt  DateTime?
+  checklist    Json?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
