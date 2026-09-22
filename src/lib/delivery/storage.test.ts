@@ -18,6 +18,7 @@ describe('LocalDiskAdapter', () => {
     const result = await adapter.save('proof.pdf', Buffer.from('hello'), 'application/pdf')
 
     expect(result.path.endsWith('.pdf')).toBe(true)
+    expect(result.path).not.toBe('proof.pdf')
     expect(existsSync(join(dir, result.path))).toBe(true)
     expect(readFileSync(join(dir, result.path), 'utf8')).toBe('hello')
     expect(result.url).toContain(result.path)
