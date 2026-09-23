@@ -1,6 +1,11 @@
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
 
-const db = new PrismaClient()
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const adapter = new PrismaPg(pool)
+const db = new PrismaClient({ adapter })
 
 async function main() {
   console.log('Seeding database…')
@@ -115,6 +120,21 @@ async function main() {
       },
     })
   }
+
+  // Demo delivery clients
+  const deliveryClientData = [
+    { name: 'Elior Braiding Studio', type: 'FREELANCE' as const, color: '#8b5cf6' },
+    { name: 'Braids by Portia', type: 'FREELANCE' as const, color: '#f59e0b' },
+    { name: 'ProdFlow', type: 'PERSONAL' as const, color: '#10b981' },
+  ]
+  for (const c of deliveryClientData) {
+    await db.deliveryClient.upsert({
+      where: { id: `seed-${c.name.toLowerCase().replace(/\s+/g, '-')}` },
+      update: {},
+      create: { id: `seed-${c.name.toLowerCase().replace(/\s+/g, '-')}`, orgId: org.id, ...c },
+    })
+  }
+  console.log('  Delivery clients:', deliveryClientData.length)
 
   console.log('Seed complete ✓')
   console.log('  User:', user.email)
