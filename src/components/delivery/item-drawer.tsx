@@ -13,15 +13,17 @@ import {
   type ChecklistItem,
   type DelayReasonCategory,
   type DeliveryItemDTO,
+  type DeliveryStatus,
 } from '@/types/delivery'
 
 interface ItemDrawerProps {
   itemId: string
   onClose: () => void
   onChanged: () => void
+  pendingStatus?: DeliveryStatus | null
 }
 
-export function ItemDrawer({ itemId, onClose, onChanged }: ItemDrawerProps) {
+export function ItemDrawer({ itemId, onClose, onChanged, pendingStatus }: ItemDrawerProps) {
   const [item, setItem] = useState<DeliveryItemDTO | null>(null)
   const [newChecklistText, setNewChecklistText] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -43,7 +45,7 @@ export function ItemDrawer({ itemId, onClose, onChanged }: ItemDrawerProps) {
 
   if (!item) return null
 
-  const needsReason = item.status === 'DELAYED' && item.delays.length === 0
+  const needsReason = (item.status === 'DELAYED' && item.delays.length === 0) || pendingStatus === 'DELAYED'
 
   const toggleChecklistItem = async (index: number) => {
     const checklist = [...(item.checklist ?? [])]

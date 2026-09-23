@@ -1,4 +1,5 @@
 import { AssetBankGrid } from '@/components/delivery/asset-bank-grid'
+import { DeliverySubnav } from '@/components/delivery/delivery-subnav'
 
 export default function AssetBankPage() {
   return (
@@ -9,6 +10,7 @@ export default function AssetBankPage() {
           Every file you've ever delivered, automatically indexed.
         </p>
       </div>
+      <DeliverySubnav />
       <AssetBankGrid />
     </div>
   )

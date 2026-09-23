@@ -19,6 +19,7 @@ export function Board() {
   const [clients, setClients] = useState<DeliveryClientDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [openItemId, setOpenItemId] = useState<string | null>(null)
+  const [pendingStatus, setPendingStatus] = useState<DeliveryStatus | null>(null)
 
   const load = useCallback(async () => {
     const [itemsRes, clientsRes] = await Promise.all([
@@ -45,6 +46,9 @@ export function Board() {
 
   const changeStatus = async (id: string, status: DeliveryStatus) => {
     if (status === 'DELIVERED' || status === 'DELAYED') {
+      if (status === 'DELAYED') {
+        setPendingStatus('DELAYED')
+      }
       setOpenItemId(id)
       return
     }
@@ -105,7 +109,11 @@ export function Board() {
       {openItemId && (
         <ItemDrawer
           itemId={openItemId}
-          onClose={() => setOpenItemId(null)}
+          pendingStatus={pendingStatus}
+          onClose={() => {
+            setOpenItemId(null)
+            setPendingStatus(null)
+          }}
           onChanged={load}
         />
       )}

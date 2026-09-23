@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ReportView } from '@/components/delivery/report-view'
+import { DeliverySubnav } from '@/components/delivery/delivery-subnav'
 import { Button } from '@/components/ui/button'
 
 interface ReportRecord {
@@ -46,6 +47,8 @@ export default function ReportsPage() {
           Weekly and monthly delivery snapshots, plus ad-hoc custom ranges.
         </p>
       </div>
+
+      <DeliverySubnav />
 
       <div
         className="flex flex-wrap items-end gap-2 rounded-xl bg-white p-3 mb-6"

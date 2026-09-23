@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const orgs = await db.organization.findMany({
     where: { deliveryItems: { some: {} } },
-    select: { id: true },
+    select: { id: true, owner: { select: { email: true } } },
   })
 
   const results: { orgId: string; reportId: string; reused: boolean }[] = []
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     })
 
     const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/delivery/reports`
-    await sendDeliveryReportEmail(summary, periodType, reportUrl).catch((err) =>
+    await sendDeliveryReportEmail(summary, periodType, reportUrl, org.owner?.email).catch((err) =>
       console.error('Failed to send delivery report email:', err)
     )
 

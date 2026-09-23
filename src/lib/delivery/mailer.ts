@@ -4,7 +4,8 @@ import type { DeliveryReportSummary } from './report'
 export async function sendDeliveryReportEmail(
   summary: DeliveryReportSummary,
   periodType: 'WEEKLY' | 'MONTHLY',
-  reportUrl: string
+  reportUrl: string,
+  recipientOverride?: string
 ): Promise<void> {
   if (!process.env.SMTP_HOST) {
     console.warn('SMTP_HOST not configured — skipping delivery report email')
@@ -30,7 +31,7 @@ export async function sendDeliveryReportEmail(
 
   await transport.sendMail({
     from: process.env.SMTP_FROM,
-    to: process.env.DELIVERY_REPORT_EMAIL_TO ?? 'niidodooofei@gmail.com',
+    to: recipientOverride ?? process.env.DELIVERY_REPORT_EMAIL_TO ?? 'niidodooofei@gmail.com',
     subject,
     html,
   })

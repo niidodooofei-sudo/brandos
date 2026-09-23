@@ -1,4 +1,5 @@
 import { Board } from '@/components/delivery/board'
+import { DeliverySubnav } from '@/components/delivery/delivery-subnav'
 
 export default function DeliveryPage() {
   return (
@@ -9,6 +10,7 @@ export default function DeliveryPage() {
           Log what you owe, prove what you delivered, explain what's late.
         </p>
       </div>
+      <DeliverySubnav />
       <Board />
     </div>
   )

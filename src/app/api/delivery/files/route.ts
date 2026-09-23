@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'deliveryItemId is required' }, { status: 400 })
   }
 
+  const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return NextResponse.json({ error: 'File exceeds the 50MB upload limit' }, { status: 413 })
+  }
+
   const item = await db.deliveryItem.findFirst({ where: { id: deliveryItemId, orgId: scope.orgId } })
   if (!item) return NextResponse.json({ error: 'Unknown deliveryItemId' }, { status: 400 })
 
