@@ -1052,7 +1052,7 @@ export async function PATCH(
   }
 
   if (body.description !== undefined) data.description = body.description.trim() || null
-  if (body.checklist !== undefined) data.checklist = body.checklist
+  if (body.checklist !== undefined) data.checklist = body.checklist as unknown as Prisma.InputJsonValue
 
   const item = await db.deliveryItem.update({
     where: { id },
