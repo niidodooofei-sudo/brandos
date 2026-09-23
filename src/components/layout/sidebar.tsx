@@ -20,6 +20,7 @@ import {
   Plus,
   Check,
   Layers,
+  PackageCheck,
 } from 'lucide-react'
 
 const navItems = [
@@ -33,6 +34,7 @@ const navItems = [
 ]
 
 const bottomItems = [
+  { href: '/delivery', label: 'Delivery', icon: PackageCheck },
   { href: '/admin', label: 'Admin', icon: ShieldCheck },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
