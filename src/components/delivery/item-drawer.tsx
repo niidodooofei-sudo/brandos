@@ -31,7 +31,8 @@ export function ItemDrawer({ itemId, onClose, onChanged }: ItemDrawerProps) {
 
   const load = async () => {
     const res = await fetch('/api/delivery/items').then((r) => r.json())
-    const found = (res.items as DeliveryItemDTO[]).find((i) => i.id === itemId)
+    const items = Array.isArray(res.items) ? (res.items as DeliveryItemDTO[]) : []
+    const found = items.find((i) => i.id === itemId)
     setItem(found ?? null)
   }
 
